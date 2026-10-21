@@ -2,7 +2,10 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#14141a">
 <title>Familia Boom LZ</title>
 <style>
 :root{--bg:#14141a;--panel:#20222f;--panel2:#2a2d3f;--ink:#f3efe6;--dim:#9aa0b4;--gold:#ffcc33;--red:#ff5a4f;--green:#3fd17f}
@@ -36,6 +39,32 @@ h1{margin:4px 0 2px;font-size:clamp(26px,5vw,46px);letter-spacing:4px;color:var(
 .help b{color:var(--ink)}
 #game{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#0b0b0f}
 canvas{image-rendering:auto;background:#000}
+/* ---- modo táctil (celulares y tablets) ---- */
+body.touch{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+body.touch #game{touch-action:none}
+body.touch .opts button{padding:13px 16px;font-size:16px}
+body.touch .pnl button{padding:11px 4px;font-size:clamp(11px,3vw,15px)}
+body.touch #menu{padding-bottom:90px}
+#touch{position:fixed;inset:0;display:none;pointer-events:none;z-index:5;--js:clamp(104px,30vmin,150px);--bs:clamp(84px,24vmin,124px)}
+#joyzone{position:absolute;left:0;bottom:0;width:50%;height:72%;pointer-events:auto;touch-action:none}
+#joyhint,#joybase{position:absolute;width:var(--js);height:var(--js);border-radius:50%;transform:translate(-50%,-50%);border:3px solid rgba(255,255,255,.32);background:rgba(255,255,255,.07)}
+#joyhint{left:calc(var(--js)*.75 + env(safe-area-inset-left,0px));bottom:calc(var(--js)*.75 + 6px);transform:translate(-50%,50%)}
+#joybase{display:none}
+#joyknob{position:absolute;left:50%;top:50%;width:44%;height:44%;margin:-22% 0 0 -22%;border-radius:50%;background:rgba(255,255,255,.5);border:3px solid rgba(255,255,255,.8)}
+#tbomb{position:absolute;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(20px + env(safe-area-inset-bottom,0px));width:var(--bs);height:var(--bs);border-radius:50%;border:4px solid #fff3b0;background:radial-gradient(circle at 35% 30%,#ffd95a,#e08a00);box-shadow:0 5px 0 #8a5300;font-size:calc(var(--bs)*.5);line-height:1;padding:0;pointer-events:auto;touch-action:none}
+#tbomb.on{transform:translateY(4px);box-shadow:0 1px 0 #8a5300}
+#tpause{position:absolute;top:calc(8px + env(safe-area-inset-top,0px));left:calc(8px + env(safe-area-inset-left,0px));width:52px;height:52px;border-radius:12px;border:2px solid rgba(255,255,255,.45);background:rgba(20,20,30,.7);font-size:24px;pointer-events:auto;touch-action:none;padding:0}
+#tpanel{position:absolute;left:50%;top:60%;transform:translateX(-50%);display:none;gap:14px;pointer-events:auto}
+#tpanel button{background:var(--gold);color:#2a1c00;border:3px solid #fff3b0;border-radius:12px;padding:14px 20px;font-size:18px;font-weight:bold;box-shadow:0 4px 0 #a37400}
+#tpanel button.alt{background:var(--panel2);color:var(--ink);border-color:#5a5f80;box-shadow:0 4px 0 #1c1e2a}
+#playfloat{position:fixed;right:14px;bottom:14px;display:none;z-index:6;background:var(--gold);color:#2a1c00;border:3px solid #fff3b0;border-radius:14px;padding:14px 26px;font-size:20px;font-weight:bold;box-shadow:0 4px 0 #a37400}
+#fs{display:none}
+@media (orientation:portrait){
+  body.touch #game{align-items:flex-start}
+  #tpause{top:auto;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));transform:translateX(-50%)}
+  #joyzone{height:42%}
+  #tpanel{top:44%}
+}
 </style>
 </head>
 <body>
@@ -51,10 +80,11 @@ canvas{image-rendering:auto;background:#000}
     <button id="pw"></button>
     <button id="diff"></button>
     <button id="snd"></button>
+    <button id="fs">⛶ Pantalla completa</button>
     <button id="play">¡JUGAR!</button>
   </div>
   <div id="msg"></div>
-  <div class="help">
+  <div class="help" id="help">
     <b>Click</b> en los botones, o con el teclado: <b>0</b> un solo jugador contra bots, <b>1-4</b> cambia el control del personaje (teclados, mandos, bot o apagado), <b>5-8</b> el equipo, <b>M</b> modo, <b>F</b> fuego amigo, <b>P</b> poderes, <b>B</b> dificultad de los bots, <b>N</b> mapa, <b>S</b> sonido, <b>Enter</b> jugar.<br>
     Con un mando: apretá un botón para sumarte en el primer lugar de bot o libre y <b>Start</b> para jugar. Ganá <b>3 rondas</b> para llevarte la partida.<br>
     Poderes que salen de las cajas: <b>bomba extra</b>, <b>más alcance</b> y <b>velocidad</b>. En partida: <b>Esc</b> o <b>Start</b> pausa, <b>M</b> silencia.<br>
@@ -62,6 +92,13 @@ canvas{image-rendering:auto;background:#000}
   </div>
 </div>
 <div id="game"><canvas id="cv"></canvas></div>
+<div id="touch">
+  <div id="joyzone"><div id="joyhint"></div><div id="joybase"><div id="joyknob"></div></div></div>
+  <button id="tbomb" aria-label="Bomba">💣</button>
+  <button id="tpause" aria-label="Pausa">⏸</button>
+  <div id="tpanel"><button id="tresume">▶ Seguir</button><button id="tquit" class="alt">🏠 Salir al menú</button></div>
+</div>
+<button id="playfloat">▶ ¡JUGAR!</button>
 
 <script>
 'use strict';
@@ -102,9 +139,19 @@ const DEVICES = {
   kb4:{label:'⌨ Numérico 8456 + 0', up:'Numpad8',down:'Numpad5',left:'Numpad4',right:'Numpad6',bomb:['Numpad0']}
 };
 
+/* ======================= TÁCTIL ======================= */
+const isTouch = (()=>{
+  try {
+    const q = /[?&]tactil=(\d)/.exec(location.search); if (q) return q[1]==='1';
+    return matchMedia('(pointer:coarse)').matches;
+  } catch(e){ return false; }
+})();
+const touch = { up:false, down:false, left:false, right:false, bomb:false, bombQ:false };
+const vib = n => { try { if (navigator.vibrate) navigator.vibrate(n); } catch(e){} };
+
 /* ======================= CONFIG (menú) ======================= */
 const cfg = {
-  dev:   ['kb2','kb1','bot','bot'],   // Dante, Gastón, Mía, Eli
+  dev:   isTouch ? ['bot','touch','bot','bot'] : ['kb2','kb1','bot','bot'],   // Dante, Gastón, Mía, Eli
   team:  [1,0,1,0],                   // 0 = rojo, 1 = verde (solo modo parejas)
   mode:  'ffa',                       // 'ffa' | 'teams'
   friendly: true,
@@ -159,6 +206,9 @@ function readDevice(dev){
     const g = padById(+dev.slice(3));
     if (g){ s = padRead(g); s.bombEdge = s.bomb && !prevBomb[dev]; }
     else s.bombEdge = false;
+  } else if (dev === 'touch'){
+    s = { up:touch.up, down:touch.down, left:touch.left, right:touch.right, bomb:touch.bomb, bombEdge:touch.bombQ };
+    touch.bombQ = false;
   } else s.bombEdge = false;
   prevBomb[dev] = s.bomb;
   return s;
@@ -166,11 +216,14 @@ function readDevice(dev){
 function devLabel(dev){
   if (dev === 'off') return 'Apagado';
   if (dev === 'bot') return '🤖 Bot';
+  if (dev === 'touch') return '📱 Táctil';
   if (DEVICES[dev]) return DEVICES[dev].label;
   return '🎮 Mando ' + (+dev.slice(3)+1);
 }
 function allDevices(){
-  const l = ['off','kb1','kb2','kb3','kb4'];
+  const l = ['off'];
+  if (isTouch) l.push('touch');
+  l.push('kb1','kb2','kb3','kb4');
   for (const g of pads()) l.push('pad'+g.index);
   l.push('bot');
   return l;
@@ -307,10 +360,12 @@ function renderMenu(){
   $('ff').textContent = 'Fuego amigo: ' + (cfg.friendly ? 'SÍ' : 'NO') + ' (F)';
   $('ff').style.display = cfg.mode === 'teams' ? '' : 'none';
   $('map').textContent = '🗺 Mapa: ' + (cfg.map==='rand' ? 'Al azar' : MAPS[cfg.map].name) + ' (N)';
+  $('solo').textContent = '🧍 1 jugador (0)';
   $('pw').textContent = '⚡ Poderes: ' + (cfg.powerups ? 'SÍ' : 'NO') + ' (P)';
   $('diff').textContent = '🤖 Bots: ' + DIFFS[cfg.diff].n + ' (B)';
   $('diff').style.display = cfg.dev.includes('bot') ? '' : 'none';
   $('snd').textContent = Sound.on ? '🔊 Sonido: SÍ (S)' : '🔇 Sonido: NO (S)';
+  if (isTouch) for (const id of ['map','solo','mode','ff','pw','diff','snd']) $(id).textContent = $(id).textContent.replace(/ \([A-Z0-9]\)$/, '');
 }
 function cycleMap(){
   const order = [...MAPS.keys(), 'rand'], k = order.indexOf(cfg.map);
@@ -319,7 +374,7 @@ function cycleMap(){
 function soloMode(){
   // 1 jugador: queda un humano (el primero que ya era humano, o Gastón con WASD) contra 3 bots
   let h = cfg.dev.findIndex(d=>d!=='off' && d!=='bot');
-  const dev = h >= 0 ? cfg.dev[h] : 'kb1'; if (h < 0) h = 1;
+  const dev = h >= 0 ? cfg.dev[h] : (isTouch ? 'touch' : 'kb1'); if (h < 0) h = 1;
   cfg.mode = 'ffa';
   cfg.dev = cfg.dev.map((d,i)=> i===h ? dev : 'bot');
   renderMenu();
@@ -394,7 +449,9 @@ function menuTick(){
 const cv = $('cv'), ctx = cv.getContext('2d');
 cv.width = W; cv.height = H;
 function fit(){
-  const s = Math.min(innerWidth/W, innerHeight/H);
+  let availH = innerHeight;
+  if (isTouch && innerHeight > innerWidth) availH = innerHeight - Math.min(220, innerHeight*0.34);   // celular parado: dejar lugar a los controles
+  const s = Math.min(innerWidth/W, availH/H);
   cv.style.width = Math.floor(W*s)+'px'; cv.style.height = Math.floor(H*s)+'px';
 }
 addEventListener('resize', fit); fit();
@@ -583,7 +640,7 @@ function killCheck(){
     for (const f of flames){
       if (f.r!==r || f.c!==c) continue;
       if (cfg.mode==='teams' && !cfg.friendly && f.owner.team===p.team && f.owner!==p) continue;
-      p.alive = false; p.deadT = 0; p.moving = false; p.killedBy = f.owner.slot; Sound.sfx('die'); break;
+      p.alive = false; p.deadT = 0; p.moving = false; p.killedBy = f.owner.slot; Sound.sfx('die'); if (p.dev==='touch') vib([80,40,200]); break;
     }
   }
   if (items.length) items = items.filter(it=>!flames.some(f=>f.r===it.r && f.c===it.c));
@@ -1191,9 +1248,9 @@ function draw(){
     ctx.font='bold 20px "Courier New",monospace'; const mt='Mapa: '+curMap.name;
     ctx.fillStyle='#000'; ctx.fillText(mt, W/2+2, HUD+(H-HUD)/2+34); ctx.fillStyle='#fff'; ctx.fillText(mt, W/2, HUD+(H-HUD)/2+32); ctx.textAlign='left';
   }
-  if (phase === 'roundover') banner(roundMsg, ['Enter / Espacio / botón del mando: siguiente ronda']);
-  if (phase === 'matchover') banner(roundMsg, ['Enter / Espacio / botón del mando: volver al menú']);
-  if (phase === 'paused') banner(['PAUSA'], ['Esc o Start: seguir jugando','M: sonido   ·   Q: volver al menú']);
+  if (phase === 'roundover') banner(roundMsg, [isTouch ? 'Tocá la pantalla: siguiente ronda' : 'Enter / Espacio / botón del mando: siguiente ronda']);
+  if (phase === 'matchover') banner(roundMsg, [isTouch ? 'Tocá la pantalla: volver al menú' : 'Enter / Espacio / botón del mando: volver al menú']);
+  if (phase === 'paused') banner(['PAUSA'], isTouch ? [''] : ['Esc o Start: seguir jugando','M: sonido   ·   Q: volver al menú']);
 }
 
 /* ======================= IA DE LOS BOTS ======================= */
@@ -1377,6 +1434,77 @@ function botTick(p, dt){
   p.input = inp;
 }
 
+/* ======================= CONTROLES TÁCTILES ======================= */
+const touchUI = $('touch'), joyzone = $('joyzone'), joybase = $('joybase'), joyknob = $('joyknob');
+let joyId = null, joyCX = 0, joyCY = 0, joyAxis = '', joyR = 56;
+function joyClear(){ touch.up = touch.down = touch.left = touch.right = false; joyAxis = ''; }
+function joyUpdate(x, y){
+  let dx = x-joyCX, dy = y-joyCY, d = Math.hypot(dx,dy);
+  if (d > joyR*1.6){ joyCX += dx/d*(d-joyR*1.6); joyCY += dy/d*(d-joyR*1.6); dx = x-joyCX; dy = y-joyCY; d = Math.hypot(dx,dy); }   // la base sigue al dedo
+  const k = d > joyR ? joyR/d : 1;
+  joyknob.style.transform = `translate(${dx*k}px,${dy*k}px)`;
+  joybase.style.left = joyCX+'px'; joybase.style.top = joyCY+'px';
+  joyClear();
+  if (d < joyR*0.28) return;
+  const ax = Math.abs(dx), ay = Math.abs(dy);
+  let h = ax > ay;
+  if (joyAxis === 'h') h = !(ay > ax*1.3); else if (joyAxis === 'v') h = ax > ay*1.3;
+  joyAxis = h ? 'h' : 'v';
+  if (h){ if (dx < 0) touch.left = true; else touch.right = true; } else { if (dy < 0) touch.up = true; else touch.down = true; }
+}
+function joyEnd(){ joyId = null; joyClear(); joybase.style.display = 'none'; joyknob.style.transform = ''; }
+joyzone.addEventListener('pointerdown', e=>{
+  if (joyId !== null) return;
+  joyId = e.pointerId; try { joyzone.setPointerCapture(e.pointerId); } catch(_){}
+  joyR = joybase.parentNode.getBoundingClientRect ? Math.max(40, parseFloat(getComputedStyle(joybase).width)/2 || 56) : 56;
+  joyCX = e.clientX; joyCY = e.clientY; joybase.style.display = 'block'; joyUpdate(e.clientX, e.clientY);
+  e.preventDefault();
+});
+joyzone.addEventListener('pointermove', e=>{ if (e.pointerId === joyId){ joyUpdate(e.clientX, e.clientY); e.preventDefault(); } });
+for (const ev of ['pointerup','pointercancel','lostpointercapture']) joyzone.addEventListener(ev, e=>{ if (e.pointerId === joyId) joyEnd(); });
+const tbomb = $('tbomb'); let bombId = null;
+tbomb.addEventListener('pointerdown', e=>{
+  bombId = e.pointerId; try { tbomb.setPointerCapture(e.pointerId); } catch(_){}
+  touch.bomb = true; touch.bombQ = true; tbomb.classList.add('on'); e.preventDefault();
+});
+for (const ev of ['pointerup','pointercancel','lostpointercapture']) tbomb.addEventListener(ev, e=>{
+  if (e.pointerId === bombId){ bombId = null; touch.bomb = false; tbomb.classList.remove('on'); }
+});
+$('tpause').addEventListener('pointerdown', e=>{ pause_edge = true; e.preventDefault(); });
+$('tresume').addEventListener('pointerdown', e=>{ pause_edge = true; e.preventDefault(); });
+$('tquit').addEventListener('pointerdown', e=>{ e.preventDefault(); if (phase === 'paused') showMenu(); });
+cv.addEventListener('pointerdown', e=>{ if (isTouch && (phase === 'roundover' || phase === 'matchover')) cont_edge = true; });
+addEventListener('contextmenu', e=>{ if (isTouch) e.preventDefault(); });
+document.addEventListener('visibilitychange', ()=>{ if (document.hidden && phase === 'play') pause_edge = true; });
+$('playfloat').addEventListener('click', ()=>startGame());
+$('fs').onclick = ()=>{
+  const el = document.documentElement;
+  try { const p = el.requestFullscreen && el.requestFullscreen(); if (p && p.then) p.then(()=>{ try { screen.orientation.lock('landscape').catch(()=>{}); } catch(_){} }).catch(()=>{}); } catch(_){}
+};
+let uiState = '';
+function syncTouchUI(){
+  if (!isTouch) return;
+  const inGame = phase !== 'menu';
+  const st = phase + (inGame ? 1 : 0);
+  if (st === uiState) return; uiState = st;
+  touchUI.style.display = inGame ? 'block' : 'none';
+  const playing = phase === 'play' || phase === 'ready';
+  joyzone.style.display = playing ? 'block' : 'none';
+  tbomb.style.display = playing ? 'block' : 'none';
+  $('tpause').style.display = (playing || phase === 'paused') ? 'block' : 'none';
+  $('tpanel').style.display = phase === 'paused' ? 'flex' : 'none';
+  $('playfloat').style.display = inGame ? 'none' : 'block';
+  if (!playing) { joyEnd(); touch.bomb = false; tbomb.classList.remove('on'); }
+}
+if (isTouch){
+  document.body.classList.add('touch');
+  if (document.documentElement.requestFullscreen) $('fs').style.display = 'inline-block';
+  $('help').innerHTML = '<b>Tocá</b> los botones para elegir quién juega y con qué control (📱 Táctil, 🤖 Bot o apagado).<br>' +
+    'En la partida: arrastrá el dedo en la <b>mitad izquierda</b> para moverte y tocá el botón <b>💣</b> para poner bombas. Ganá <b>3 rondas</b> para llevarte la partida.<br>' +
+    'Poderes que salen de las cajas: <b>bomba extra</b>, <b>más alcance</b> y <b>velocidad</b>.<br>' +
+    'Conviene jugar con el celular <b>acostado</b>. En Chrome podés usar el menú ⋮ → «Agregar a pantalla principal» para abrirlo como una app.';
+}
+
 /* ======================= BUCLE ======================= */
 cv.addEventListener('click', e=>{
   const rc = cv.getBoundingClientRect();
@@ -1388,6 +1516,7 @@ function frame(now){
   requestAnimationFrame(frame);
   const dt = Math.min(0.1, (now-last)/1000); last = now;
   if (freeze){ keyEdge.clear(); return; }
+  syncTouchUI();
   if (phase === 'menu'){ menuTick(); }
   else {
     pollInputs();
@@ -1406,7 +1535,7 @@ renderMenu();
 requestAnimationFrame(frame);
 
 // ganchos para pruebas
-window.__g = { MAPS, pickMap, cycleMap, get curMap(){ return curMap; }, soloMode, cfg, startGame, startRound, update, draw, showMenu, Sound, DIFFS, applyItem, dangerMap, botThink, escapeOK, scoreBomb, chooseGoal, bfsAI, tileOf,
+window.__g = { isTouch, touch, syncTouchUI, MAPS, pickMap, cycleMap, get curMap(){ return curMap; }, soloMode, cfg, startGame, startRound, update, draw, showMenu, Sound, DIFFS, applyItem, dangerMap, botThink, escapeOK, scoreBomb, chooseGoal, bfsAI, tileOf,
   get state(){ return { roundT, sdIdx, sdBlocks, phase, grid, bombs, flames, players, scores, endTimer, roundMsg, items, drops, timeNow }; },
   setPhase:(p)=>{ phase = p; }, setRoundT:(v)=>{ roundT = v; }, setFreeze:(v)=>{ freeze = v; }, placeBomb, explode, killCheck, finishRound,
   runFrames(n){ for (let i=0;i<n;i++){ update(1/60); if (phase==='roundover' || phase==='matchover') return i+1; } return n; } };
