@@ -49,11 +49,12 @@ body.touch #menu{padding-bottom:90px}
 #joyzone{position:absolute;left:0;bottom:0;width:50%;height:72%;pointer-events:auto;touch-action:none}
 #joyhint,#joybase{position:absolute;width:var(--js);height:var(--js);border-radius:50%;transform:translate(-50%,-50%);border:3px solid rgba(255,255,255,.32);background:rgba(255,255,255,.07)}
 #joyhint{left:calc(var(--js)*.75 + env(safe-area-inset-left,0px));bottom:calc(var(--js)*.75 + 6px);transform:translate(-50%,50%)}
-#joybase{display:none}
+#joybase{display:none;position:fixed}
 #joyknob{position:absolute;left:50%;top:50%;width:44%;height:44%;margin:-22% 0 0 -22%;border-radius:50%;background:rgba(255,255,255,.5);border:3px solid rgba(255,255,255,.8)}
 #tbomb{position:absolute;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(20px + env(safe-area-inset-bottom,0px));width:var(--bs);height:var(--bs);border-radius:50%;border:4px solid #fff3b0;background:radial-gradient(circle at 35% 30%,#ffd95a,#e08a00);box-shadow:0 5px 0 #8a5300;font-size:calc(var(--bs)*.5);line-height:1;padding:0;pointer-events:auto;touch-action:none}
 #tbomb.on{transform:translateY(4px);box-shadow:0 1px 0 #8a5300}
 #tpause{position:absolute;top:calc(8px + env(safe-area-inset-top,0px));left:calc(8px + env(safe-area-inset-left,0px));width:52px;height:52px;border-radius:12px;border:2px solid rgba(255,255,255,.45);background:rgba(20,20,30,.7);font-size:24px;pointer-events:auto;touch-action:none;padding:0}
+#tfs{position:absolute;top:calc(8px + env(safe-area-inset-top,0px));left:calc(70px + env(safe-area-inset-left,0px));width:52px;height:52px;border-radius:12px;border:2px solid rgba(255,255,255,.45);background:rgba(20,20,30,.7);font-size:26px;pointer-events:auto;touch-action:none;padding:0;display:none}
 #tpanel{position:absolute;left:50%;top:60%;transform:translateX(-50%);display:none;gap:14px;pointer-events:auto}
 #tpanel button{background:var(--gold);color:#2a1c00;border:3px solid #fff3b0;border-radius:12px;padding:14px 20px;font-size:18px;font-weight:bold;box-shadow:0 4px 0 #a37400}
 #tpanel button.alt{background:var(--panel2);color:var(--ink);border-color:#5a5f80;box-shadow:0 4px 0 #1c1e2a}
@@ -62,6 +63,7 @@ body.touch #menu{padding-bottom:90px}
 @media (orientation:portrait){
   body.touch #game{align-items:flex-start}
   #tpause{top:auto;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));transform:translateX(-50%)}
+  #tfs{top:auto;left:calc(50% + 40px);bottom:calc(14px + env(safe-area-inset-bottom,0px))}
   #joyzone{height:42%}
   #tpanel{top:44%}
 }
@@ -96,6 +98,7 @@ body.touch #menu{padding-bottom:90px}
   <div id="joyzone"><div id="joyhint"></div><div id="joybase"><div id="joyknob"></div></div></div>
   <button id="tbomb" aria-label="Bomba">💣</button>
   <button id="tpause" aria-label="Pausa">⏸</button>
+  <button id="tfs" aria-label="Pantalla completa">⛶</button>
   <div id="tpanel"><button id="tresume">▶ Seguir</button><button id="tquit" class="alt">🏠 Salir al menú</button></div>
 </div>
 <button id="playfloat">▶ ¡JUGAR!</button>
@@ -417,7 +420,7 @@ $('ff').onclick   = e=>{ e.target.blur(); cfg.friendly = !cfg.friendly; renderMe
 $('pw').onclick   = e=>{ e.target.blur(); cfg.powerups = !cfg.powerups; renderMenu(); };
 $('diff').onclick = e=>{ e.target.blur(); cycleDiff(); };
 $('snd').onclick  = e=>{ e.target.blur(); toggleSound(); };
-$('play').onclick = e=>{ e.target.blur(); startGame(); };
+$('play').onclick = e=>{ e.target.blur(); enterFS(); startGame(); };
 addEventListener('gamepadconnected', ()=>{ if (phase==='menu') renderMenu(); });
 addEventListener('gamepaddisconnected', e=>{
   const d = 'pad'+e.gamepad.index;
@@ -1443,6 +1446,9 @@ function joyUpdate(x, y){
   if (d > joyR*1.6){ joyCX += dx/d*(d-joyR*1.6); joyCY += dy/d*(d-joyR*1.6); dx = x-joyCX; dy = y-joyCY; d = Math.hypot(dx,dy); }   // la base sigue al dedo
   const k = d > joyR ? joyR/d : 1;
   joyknob.style.transform = `translate(${dx*k}px,${dy*k}px)`;
+  joyCX = Math.min(Math.max(joyCX, joyR+6), innerWidth-joyR-6); joyCY = Math.min(Math.max(joyCY, joyR+6), innerHeight-joyR-6);
+  dx = x-joyCX; dy = y-joyCY; d = Math.hypot(dx,dy);
+  const k2 = d > joyR ? joyR/d : 1; joyknob.style.transform = `translate(${dx*k2}px,${dy*k2}px)`;
   joybase.style.left = joyCX+'px'; joybase.style.top = joyCY+'px';
   joyClear();
   if (d < joyR*0.28) return;
@@ -1452,12 +1458,12 @@ function joyUpdate(x, y){
   joyAxis = h ? 'h' : 'v';
   if (h){ if (dx < 0) touch.left = true; else touch.right = true; } else { if (dy < 0) touch.up = true; else touch.down = true; }
 }
-function joyEnd(){ joyId = null; joyClear(); joybase.style.display = 'none'; joyknob.style.transform = ''; }
+function joyEnd(){ joyId = null; joyClear(); joybase.style.display = 'none'; joyknob.style.transform = ''; $('joyhint').style.visibility = 'visible'; }
 joyzone.addEventListener('pointerdown', e=>{
   if (joyId !== null) return;
   joyId = e.pointerId; try { joyzone.setPointerCapture(e.pointerId); } catch(_){}
   joyR = joybase.parentNode.getBoundingClientRect ? Math.max(40, parseFloat(getComputedStyle(joybase).width)/2 || 56) : 56;
-  joyCX = e.clientX; joyCY = e.clientY; joybase.style.display = 'block'; joyUpdate(e.clientX, e.clientY);
+  joyCX = e.clientX; joyCY = e.clientY; joybase.style.display = 'block'; $('joyhint').style.visibility = 'hidden'; joyUpdate(e.clientX, e.clientY);
   e.preventDefault();
 });
 joyzone.addEventListener('pointermove', e=>{ if (e.pointerId === joyId){ joyUpdate(e.clientX, e.clientY); e.preventDefault(); } });
@@ -1476,11 +1482,24 @@ $('tquit').addEventListener('pointerdown', e=>{ e.preventDefault(); if (phase ==
 cv.addEventListener('pointerdown', e=>{ if (isTouch && (phase === 'roundover' || phase === 'matchover')) cont_edge = true; });
 addEventListener('contextmenu', e=>{ if (isTouch) e.preventDefault(); });
 document.addEventListener('visibilitychange', ()=>{ if (document.hidden && phase === 'play') pause_edge = true; });
-$('playfloat').addEventListener('click', ()=>startGame());
-$('fs').onclick = ()=>{
-  const el = document.documentElement;
-  try { const p = el.requestFullscreen && el.requestFullscreen(); if (p && p.then) p.then(()=>{ try { screen.orientation.lock('landscape').catch(()=>{}); } catch(_){} }).catch(()=>{}); } catch(_){}
-};
+$('playfloat').addEventListener('click', ()=>{ enterFS(); startGame(); });
+const canFS = !!(document.documentElement.requestFullscreen);
+function enterFS(){
+  if (!isTouch || !canFS || document.fullscreenElement) return;
+  try {
+    const p = document.documentElement.requestFullscreen({ navigationUI:'hide' });
+    if (p && p.then) p.then(()=>{ try { screen.orientation.lock('landscape').catch(()=>{}); } catch(_){} }).catch(()=>{});
+  } catch(_){}
+}
+function syncFS(){
+  const fs = !!document.fullscreenElement;
+  $('tfs').style.display = (isTouch && canFS && !fs && phase !== 'menu') ? 'block' : 'none';
+  $('fs').style.display = (isTouch && canFS && !fs) ? 'inline-block' : 'none';
+  fit();
+}
+document.addEventListener('fullscreenchange', ()=>{ syncFS(); uiState = ''; });
+$('fs').onclick = enterFS;
+$('tfs').addEventListener('pointerdown', e=>{ e.preventDefault(); enterFS(); });
 let uiState = '';
 function syncTouchUI(){
   if (!isTouch) return;
@@ -1494,11 +1513,11 @@ function syncTouchUI(){
   $('tpause').style.display = (playing || phase === 'paused') ? 'block' : 'none';
   $('tpanel').style.display = phase === 'paused' ? 'flex' : 'none';
   $('playfloat').style.display = inGame ? 'none' : 'block';
+  syncFS();
   if (!playing) { joyEnd(); touch.bomb = false; tbomb.classList.remove('on'); }
 }
 if (isTouch){
   document.body.classList.add('touch');
-  if (document.documentElement.requestFullscreen) $('fs').style.display = 'inline-block';
   $('help').innerHTML = '<b>Tocá</b> los botones para elegir quién juega y con qué control (📱 Táctil, 🤖 Bot o apagado).<br>' +
     'En la partida: arrastrá el dedo en la <b>mitad izquierda</b> para moverte y tocá el botón <b>💣</b> para poner bombas. Ganá <b>3 rondas</b> para llevarte la partida.<br>' +
     'Poderes que salen de las cajas: <b>bomba extra</b>, <b>más alcance</b> y <b>velocidad</b>.<br>' +
