@@ -567,6 +567,7 @@ function showMenu(){
 
 function startRound(){
   roundNo++;
+  if (cfg.map === 'rand' && roundNo > 1) pickMap();      // mapa al azar: uno distinto en cada ronda
   // mapa
   grid = [];
   const safe = new Set();
@@ -1611,7 +1612,7 @@ function netBroadcastStart(){
 }
 const r1 = v => Math.round(v*10)/10;
 function netSnapshot(){
-  const m = { t:'s', ph:phase, rn:roundNo, rt:+roundT.toFixed(2), rd:+readyT.toFixed(2), rg:readyGo?1:0, sd:sdIdx, sc:scores, rm:roundMsg,
+  const m = { t:'s', mp:MAPS.indexOf(curMap), ph:phase, rn:roundNo, rt:+roundT.toFixed(2), rd:+readyT.toFixed(2), rg:readyGo?1:0, sd:sdIdx, sc:scores, rm:roundMsg,
     p: players.map(p=>[p.slot, r1(p.x), r1(p.y), DIRN.indexOf(p.dir), p.moving?1:0, p.alive?1:0, +p.deadT.toFixed(2), p.maxBombs, p.range, p.sp, p.dev === 'bot' ? 1 : 0]),
     b: bombs.map(b=>[b.r, b.c, +b.t.toFixed(2)]), f: flames.map(f=>[f.r, f.c, +f.t.toFixed(2)]),
     i: items.map(i=>[i.r, i.c, i.type]), g: grid.map(r=>r.join('')).join(''), e: NET.evq.splice(0) };
@@ -1668,6 +1669,7 @@ function netGuestStart(m){
 }
 function netApplySnap(m){
   const prev = phase;
+  if (m.mp !== undefined && curMap !== MAPS[m.mp]){ curMap = MAPS[m.mp]; bgCanvas = makeBG(); sdList = makeSpiral(); }
   phase = m.ph; roundNo = m.rn; roundT = m.rt; readyT = m.rd; readyGo = !!m.rg; sdIdx = m.sd; scores = m.sc; roundMsg = m.rm;
   for (const a of m.p){
     const p = players.find(q=>q.slot === a[0]); if (!p) continue;
