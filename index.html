@@ -307,14 +307,23 @@ function drawFrame(ctx, key, fi, cx, feetY, flip, alpha, scale){
 
 /* ======================= SONIDO (todo sintetizado) ======================= */
 const NF = s => 440*Math.pow(2, s/12);            // semitonos desde La4
-const BPM = 150, SPS = 60/BPM/4;                  // segundos por semicorchea
-const CHORDS = [[0,3,7,12],[-4,0,3,8],[3,7,10,15],[-2,2,5,10]];   // Am F C G
-const ROOTS  = [-24,-28,-21,-26];
-const LEAD_A = [0,null,1,null,2,null,1,null,3,null,2,null,1,null,2,null];
-const LEAD_B = [3,null,2,null,1,null,0,null,1,null,2,null,3,3,null,2];
-const BASS_STEPS = [0,3,6,8,11,14];
+/* Una música distinta por mapa (mismo orden que MAPS: Calle, Súper, Plaza, Playa) */
+const TRACKS = [
+  { bpm:150, chords:[[0,3,7,12],[-4,0,3,8],[3,7,10,15],[-2,2,5,10]], roots:[-24,-28,-21,-26],               // Calle: Am F C G, acción
+    A:[0,null,1,null,2,null,1,null,3,null,2,null,1,null,2,null], B:[3,null,2,null,1,null,0,null,1,null,2,null,3,3,null,2],
+    bass:[0,3,6,8,11,14], bassUp:[6,14], lw:'square', bw:'triangle', lv:.30, kick:[0,8], snare:[4,12], hat:'even' },
+  { bpm:132, chords:[[3,7,10,15],[0,3,7,12],[-4,0,3,8],[-2,2,5,10]], roots:[-21,-24,-28,-26],               // Súper: Do mayor, saltarina
+    A:[0,null,2,1,null,2,3,null,2,null,1,null,0,null,1,null], B:[3,null,3,2,null,1,2,null,0,null,1,2,3,null,null,2],
+    bass:[0,2,4,8,10,12], bassUp:[4,12], lw:'square', bw:'square', lv:.22, bv:.38, kick:[0,6,8,14], snare:[4,12], hat:'all' },
+  { bpm:116, chords:[[-7,-3,0,5],[-2,2,5,10],[0,4,7,12],[-10,-7,-3,2]], roots:[-31,-26,-24,-22],            // Plaza: Re Sol La Si-, folk con arpegios
+    A:[0,1,2,3,2,1,2,1,0,1,2,3,2,1,0,null], B:[3,2,1,0,1,2,3,null,2,1,0,1,2,3,2,null],
+    bass:[0,8], bassUp:[], lw:'triangle', bw:'sine', lv:.50, bv:.7, kick:[0,8], snare:[], hat:'none' },
+  { bpm:104, chords:[[-5,-1,2,7],[0,4,7,12],[2,6,9,14],[0,4,7,12]], roots:[-29,-24,-22,-24],                // Playa: Mi La Si La, onda reggae/surf
+    A:[null,null,3,null,null,2,null,3,null,null,1,null,2,null,3,null], B:[3,null,null,2,null,null,1,null,2,null,null,3,null,2,1,null],
+    bass:[0,3,8,11,14], bassUp:[14], lw:'sawtooth', bw:'triangle', lv:.16, bv:.6, kick:[0,10], snare:[8], hat:'off', stab:true }
+];
 const Sound = {
-  ctx:null, master:null, mus:null, sfxG:null, nbuf:null, on:true, playing:false, step:0, loop:0, nextT:0, timer:null, paused:false,
+  ctx:null, master:null, mus:null, sfxG:null, nbuf:null, on:true, playing:false, step:0, loop:0, nextT:0, tr:TRACKS[0], sps:60/150/4, timer:null, paused:false,
   attach(ctx){
     this.ctx = ctx;
     this.master = ctx.createGain(); this.master.gain.value = this.on ? 0.7 : 0; this.master.connect(ctx.destination);
@@ -366,25 +375,28 @@ const Sound = {
     }
   },
   musicStep(s, t){
-    const bar = (s>>4)&3, st = s&15, B = this.loop&1;
-    const lp = (B ? LEAD_B : LEAD_A)[st];
-    if (lp != null) this.toneAt(NF(CHORDS[bar][lp] + (this.loop&2 ? 12 : 0)), SPS*1.7, 'square', .30, t, null, this.mus);
-    if (BASS_STEPS.includes(st)) this.toneAt(NF(ROOTS[bar] + ((st===6||st===14)?12:0)), SPS*1.8, 'triangle', .55, t, null, this.mus);
-    if (st===0 || st===8) this.toneAt(130, .12, 'sine', .7, t, 42, this.mus);
-    if (st===4 || st===12) this.noiseAt(.09, .35, t, 6000, 1500, this.mus);
-    if (st%2===0) this.noiseAt(.03, .16, t, 9000, 7000, this.mus);
+    const T = this.tr, SPS = this.sps, bar = (s>>4)&3, st = s&15, Bp = this.loop&1;
+    const lp = (Bp ? T.B : T.A)[st], oct = (this.loop&2) ? 12 : 0, ch = T.chords[bar];
+    if (lp != null) this.toneAt(NF(ch[lp] + oct), SPS*1.7, T.lw, T.lv, t, null, this.mus);
+    if (T.stab && st%8===4) [0,1,2].forEach(i=>this.toneAt(NF(ch[i]), SPS*1.2, 'square', .09, t, null, this.mus));   // contratiempo
+    if (T.bass.includes(st)) this.toneAt(NF(T.roots[bar] + (T.bassUp.includes(st)?12:0)), SPS*1.8, T.bw, T.bv||.55, t, null, this.mus);
+    if (T.kick.includes(st)) this.toneAt(130, .12, 'sine', .7, t, 42, this.mus);
+    if (T.snare.includes(st)) this.noiseAt(.09, .35, t, 6000, 1500, this.mus);
+    if ((T.hat==='even' && st%2===0) || T.hat==='all' || (T.hat==='off' && st%4===2)) this.noiseAt(.03, .16, t, 9000, 7000, this.mus);
   },
   sched(){
     const c = this.ctx;
     if (!c || c.state !== 'running'){ if (c) this.nextT = c.currentTime + 0.1; return; }
     while (this.nextT < c.currentTime + 0.3){
       this.musicStep(this.step, this.nextT);
-      this.nextT += SPS; this.step = (this.step+1) % 64;
+      this.nextT += this.sps; this.step = (this.step+1) % 64;
       if (this.step === 0) this.loop++;
     }
   },
   startMusic(){
-    if (!this.ctx || this.playing) return;
+    if (!this.ctx) return;
+    const mi = Math.max(0, MAPS.indexOf(curMap)); this.tr = TRACKS[mi] || TRACKS[0]; this.sps = 60/this.tr.bpm/4;
+    if (this.playing) return;
     this.playing = true; this.step = 0; this.loop = 0; this.nextT = this.ctx.currentTime + 0.1;
     this.timer = setInterval(()=>this.sched(), 40);
   },
@@ -1885,7 +1897,7 @@ renderMenu();
 requestAnimationFrame(frame);
 
 // ganchos para pruebas
-window.__g = { NET, netCreate, netJoin, netLeave, netKick, openOnlPanel, isTouch, touch, syncTouchUI, MAPS, pickMap, cycleMap, get curMap(){ return curMap; }, soloMode, cfg, startGame, startRound, update, draw, showMenu, Sound, DIFFS, applyItem, dangerMap, botThink, escapeOK, scoreBomb, chooseGoal, bfsAI, tileOf,
+window.__g = { TRACKS, NET, netCreate, netJoin, netLeave, netKick, openOnlPanel, isTouch, touch, syncTouchUI, MAPS, pickMap, cycleMap, get curMap(){ return curMap; }, soloMode, cfg, startGame, startRound, update, draw, showMenu, Sound, DIFFS, applyItem, dangerMap, botThink, escapeOK, scoreBomb, chooseGoal, bfsAI, tileOf,
   get state(){ return { roundNo, roundT, sdIdx, sdBlocks, phase, grid, bombs, flames, players, scores, endTimer, roundMsg, items, drops, timeNow }; },
   setPhase:(p)=>{ phase = p; }, setRoundT:(v)=>{ roundT = v; }, setFreeze:(v)=>{ freeze = v; }, placeBomb, explode, killCheck, finishRound,
   runFrames(n){ for (let i=0;i<n;i++){ update(1/60); if (phase==='roundover' || phase==='matchover') return i+1; } return n; } };
