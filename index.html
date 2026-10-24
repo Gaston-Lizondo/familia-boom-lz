@@ -174,10 +174,10 @@ const FUSE = 2.4, FLAME_T = 0.55, BASE_RANGE = 2, BASE_BOMBS = 1, SPEED = 3.0*T;
 const MAX_BOMBS = 6, MAX_RANGE = 8, MAX_SPEED_LV = 5, SPEED_STEP = 0.10;
 const DROP_CHANCE = 0.34;                       // probabilidad de que una caja suelte un poder
 const ITEMCOL = { bomb:'#6aa7ff', fire:'#ff9d2e', speed:'#7af27a' };
-const DIFFS = [
-  { n:'Fácil',   think:.34, margin:.04, aggr:.45, pick:.6,  wander:.22, dw:1.4, hesitate:.25 },
-  { n:'Normal',  think:.16, margin:.14, aggr:1.0, pick:1.0, wander:.04, dw:1.1, hesitate:0 },
-  { n:'Difícil', think:.09, margin:.20, aggr:1.8, pick:1.5, wander:0,   dw:.9,  hesitate:0 }
+const DIFFS = [   // spd: velocidad del bot respecto a un jugador con los mismos power-ups · blunder: chance de poner bomba sin salida (se mata solo)
+  { n:'Fácil',   think:.45, margin:0,   aggr:.25, pick:.4,  wander:.30, dw:1.6, hesitate:.35, spd:.70, blunder:.16 },
+  { n:'Normal',  think:.34, margin:.04, aggr:.45, pick:.6,  wander:.22, dw:1.4, hesitate:.25, spd:.80, blunder:.08 },
+  { n:'Difícil', think:.16, margin:.14, aggr:1.0, pick:1.0, wander:.04, dw:1.1, hesitate:0,   spd:.90, blunder:.03 }
 ];
 
 const DEVICES = {
@@ -657,8 +657,9 @@ function movePlayer(p, dt){
   p.dir = d;
   const ax = (d==='left'||d==='right') ? 'x' : 'y';
   const sg = (d==='right'||d==='down') ? 1 : -1;
-  p.moving = tryMove(p, ax, sg, p.speed*dt);
+  p.moving = tryMove(p, ax, sg, spd(p)*dt);
 }
+const spd = p => p.dev === 'bot' ? p.speed*DIFFS[cfg.diff].spd : p.speed;   // los bots van un poco más lentos que una persona
 function overlapsTile(p, r, c){
   return p.x+HALF > c*T && p.x-HALF < (c+1)*T && p.y+HALF > r*T && p.y-HALF < (r+1)*T;
 }
@@ -1394,7 +1395,7 @@ function pathAI(prev,sk,tk){
 }
 function escapeOK(p,r,c,D){
   const iv = dangerMap({ r, c, t:FUSE, range:p.range });
-  const { dist } = bfsAI(r,c,iv,T/p.speed,D.margin,p,10);
+  const { dist } = bfsAI(r,c,iv,T/spd(p),D.margin,p,10);
   for (const [k,d] of dist) if (d>0 && iv[(k/COLS)|0][k%COLS].length===0) return true;
   return false;
 }
@@ -1430,6 +1431,7 @@ function chooseGoal(p,r,c,D,dist){
     if (cd.type === 'item') return { r:cd.r, c:cd.c, type:'item', until:timeNow+1.6 };
     if (checks++ >= 6) break;
     if (escapeOK(p,cd.r,cd.c,D)) return { r:cd.r, c:cd.c, type:'bomb', until:timeNow+1.6 };
+    if (Math.random() < D.blunder) return { r:cd.r, c:cd.c, type:'bomb', until:timeNow+1.6, blind:true };   // se le pasa: no mira si puede escapar
   }
   let tgt = null, bd = 1e9;
   for (const e of enemies){ const [er,ec] = tileOf(e), dd = Math.abs(er-r)+Math.abs(ec-c); if (dd<bd){ bd = dd; tgt = [er,ec]; } }
@@ -1452,7 +1454,7 @@ function wanderPath(iv,dist,prev,sk){
 }
 function botThink(p){
   const D = DIFFS[cfg.diff];
-  const [r,c] = tileOf(p), tt = T/p.speed, sk = r*COLS+c;
+  const [r,c] = tileOf(p), tt = T/spd(p), sk = r*COLS+c;
   p.botBomb = false;
   const iv = dangerMap(null);
   if (iv[r][c].length){                                   // estoy en peligro: huir
@@ -1474,7 +1476,7 @@ function botThink(p){
   let g = p.goal;
   if (g && (timeNow > g.until || (g.type!=='chase' && !dist.has(g.r*COLS+g.c)))) g = p.goal = null;
   if (g && g.r===r && g.c===c){
-    if (g.type==='bomb' && p.out<p.maxBombs && !bombAt(r,c) && escapeOK(p,r,c,D)){ p.botBomb = true; p.goal = null; p.botPath = []; return; }
+    if (g.type==='bomb' && p.out<p.maxBombs && !bombAt(r,c) && (g.blind || escapeOK(p,r,c,D))){ p.botBomb = true; p.goal = null; p.botPath = []; return; }
     g = p.goal = null;
   }
   if (!g){
